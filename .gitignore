@@ -94,3 +94,12 @@ temp/
 
 # NestJS specific
 .nest/
+
+
+# Deployment folders (at any level)
+**/deployments/
+**/deployment/
+
+# NX cache and temp files
+**.nx/*
+.nx/cache/**

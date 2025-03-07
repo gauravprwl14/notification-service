@@ -22,10 +22,8 @@ interface SalesforceConnectionOptions {
  */
 export enum NotificationType {
   USER_UPDATE = 'user.update',
-  APPLICATION_UPDATE = 'application.update',
-  SALESFORCE_CASE_CREATE = 'salesforce.case.create',
-  SALESFORCE_CASE_UPDATE = 'salesforce.case.update',
-  SALESFORCE_CONTACT_UPDATE = 'salesforce.contact.update',
+  APPLICATION_UPDATE = 'com.tyfone.nao.application.update',
+  APPLICATION_CREATE = 'com.tyfone.nao.application.create',
 }
 
 /**
@@ -349,17 +347,8 @@ export class NotificationHandler {
 
       // Add specific handling for different event types
       switch (event.type) {
-        case NotificationType.SALESFORCE_CASE_CREATE:
+        case NotificationType.APPLICATION_CREATE:
           await this.processSalesforceCaseCreate(event, payload);
-          break;
-        case NotificationType.SALESFORCE_CASE_UPDATE:
-          await this.processSalesforceCaseUpdate(event, payload);
-          break;
-        case NotificationType.SALESFORCE_CONTACT_UPDATE:
-          await this.processSalesforceContactUpdate(event, payload);
-          break;
-        case NotificationType.USER_UPDATE:
-          await this.processUserUpdate(event, payload);
           break;
         case NotificationType.APPLICATION_UPDATE:
           await this.processApplicationUpdate(event, payload);
@@ -396,7 +385,7 @@ export class NotificationHandler {
       // const caseData = this.validateSalesforceCasePayload(payload);
 
       await this.salesforceEventService.sendNotificationEvent({
-        type: 'evt.nao.application.create',
+        type: event.type,
         data: JSON.stringify({
           ...payload,
           tenant: event.tenant,
@@ -407,68 +396,6 @@ export class NotificationHandler {
     } catch (error) {
       this.logger.error(
         'Failed to send Salesforce case creation event:',
-        error,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Process Salesforce case update notification
-   * @param event The notification event
-   * @param payload The notification payload
-   */
-  private async processSalesforceCaseUpdate(
-    event: NotificationEvent,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    this.logger.debug('Processing Salesforce case update');
-    try {
-      const caseData = this.validateSalesforceCasePayload(payload);
-      if (!caseData.caseId) {
-        throw new Error('Case ID is required for case update');
-      }
-
-      await this.salesforceEventService.sendNotificationEvent({
-        type: 'evt.nao.case.update',
-        data: JSON.stringify({
-          ...caseData,
-          tenant: event.tenant,
-        }),
-      });
-
-      this.logger.debug('Successfully sent Salesforce case update event');
-    } catch (error) {
-      this.logger.error('Failed to send Salesforce case update event:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process Salesforce contact update notification
-   * @param event The notification event
-   * @param payload The notification payload
-   */
-  private async processSalesforceContactUpdate(
-    event: NotificationEvent,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    this.logger.debug('Processing Salesforce contact update');
-    try {
-      const contactData = this.validateSalesforceContactPayload(payload);
-
-      await this.salesforceEventService.sendNotificationEvent({
-        type: 'evt.nao.contact.update',
-        data: JSON.stringify({
-          ...contactData,
-          tenant: event.tenant,
-        }),
-      });
-
-      this.logger.debug('Successfully sent Salesforce contact update event');
-    } catch (error) {
-      this.logger.error(
-        'Failed to send Salesforce contact update event:',
         error,
       );
       throw error;
