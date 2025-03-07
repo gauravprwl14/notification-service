@@ -4,7 +4,6 @@ import { CoreModule } from '@notification-service/core';
 import { HandlersModule } from './handlers/handlers.module';
 import { ServicesModule } from './services/services.module';
 import * as Joi from 'joi';
-import { NotificationHandler } from './handlers/notification.handler';
 import {
   configValidationSchema,
   awsConfig,
@@ -48,6 +47,5 @@ import {
     HandlersModule,
     ServicesModule,
   ],
-  providers: [NotificationHandler],
 })
 export class AppModule {}

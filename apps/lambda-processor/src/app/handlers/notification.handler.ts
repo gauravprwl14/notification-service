@@ -5,6 +5,28 @@ import {
   EncryptionService,
   EncryptionContext,
 } from '@notification-service/core';
+import { SalesforceEventService } from '@notification-service/salesforce-integration';
+
+/**
+ * Interface for Salesforce connection options
+ */
+interface SalesforceConnectionOptions {
+  instanceUrl: string;
+  privateKey: string;
+  consumerKey: string;
+  username: string;
+}
+
+/**
+ * Supported notification types
+ */
+export enum NotificationType {
+  USER_UPDATE = 'user.update',
+  APPLICATION_UPDATE = 'application.update',
+  SALESFORCE_CASE_CREATE = 'salesforce.case.create',
+  SALESFORCE_CASE_UPDATE = 'salesforce.case.update',
+  SALESFORCE_CONTACT_UPDATE = 'salesforce.contact.update',
+}
 
 /**
  * Interface for SNS Message structure
@@ -68,10 +90,13 @@ export class NotificationHandler {
   /**
    * Constructor for NotificationHandler
    * @param encryptionService Encryption service for decrypting payloads
+   * @param salesforceEventService Salesforce event service for sending platform events
    */
   constructor(
     @Inject('ENCRYPTION_SERVICE')
     private readonly encryptionService: EncryptionService,
+    @Inject('SALESFORCE_EVENT_SERVICE')
+    private readonly salesforceEventService: SalesforceEventService,
   ) {}
 
   /**
@@ -324,13 +349,20 @@ export class NotificationHandler {
 
       // Add specific handling for different event types
       switch (event.type) {
-        case 'user.update':
-          // Handle user update event
-          this.logger.debug('Processing user update notification');
+        case NotificationType.SALESFORCE_CASE_CREATE:
+          await this.processSalesforceCaseCreate(event, payload);
           break;
-        case 'application.update':
-          // Handle application update event
-          this.logger.debug('Processing application update notification');
+        case NotificationType.SALESFORCE_CASE_UPDATE:
+          await this.processSalesforceCaseUpdate(event, payload);
+          break;
+        case NotificationType.SALESFORCE_CONTACT_UPDATE:
+          await this.processSalesforceContactUpdate(event, payload);
+          break;
+        case NotificationType.USER_UPDATE:
+          await this.processUserUpdate(event, payload);
+          break;
+        case NotificationType.APPLICATION_UPDATE:
+          await this.processApplicationUpdate(event, payload);
           break;
         default:
           this.logger.warn(`Unknown notification type: ${event.type}`);
@@ -348,5 +380,179 @@ export class NotificationHandler {
       );
       throw error;
     }
+  }
+
+  /**
+   * Process Salesforce case creation notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processSalesforceCaseCreate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing Salesforce case creation');
+    try {
+      // const caseData = this.validateSalesforceCasePayload(payload);
+
+      await this.salesforceEventService.sendNotificationEvent({
+        type: 'evt.nao.application.create',
+        data: JSON.stringify({
+          ...payload,
+          tenant: event.tenant,
+        }),
+      });
+
+      this.logger.debug('Successfully sent Salesforce case creation event');
+    } catch (error) {
+      this.logger.error(
+        'Failed to send Salesforce case creation event:',
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Process Salesforce case update notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processSalesforceCaseUpdate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing Salesforce case update');
+    try {
+      const caseData = this.validateSalesforceCasePayload(payload);
+      if (!caseData.caseId) {
+        throw new Error('Case ID is required for case update');
+      }
+
+      await this.salesforceEventService.sendNotificationEvent({
+        type: 'evt.nao.case.update',
+        data: JSON.stringify({
+          ...caseData,
+          tenant: event.tenant,
+        }),
+      });
+
+      this.logger.debug('Successfully sent Salesforce case update event');
+    } catch (error) {
+      this.logger.error('Failed to send Salesforce case update event:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process Salesforce contact update notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processSalesforceContactUpdate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing Salesforce contact update');
+    try {
+      const contactData = this.validateSalesforceContactPayload(payload);
+
+      await this.salesforceEventService.sendNotificationEvent({
+        type: 'evt.nao.contact.update',
+        data: JSON.stringify({
+          ...contactData,
+          tenant: event.tenant,
+        }),
+      });
+
+      this.logger.debug('Successfully sent Salesforce contact update event');
+    } catch (error) {
+      this.logger.error(
+        'Failed to send Salesforce contact update event:',
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Validate Salesforce case payload
+   * @param payload The payload to validate
+   * @returns Validated case data
+   */
+  private validateSalesforceCasePayload(payload: Record<string, unknown>): any {
+    if (!payload.subject) {
+      throw new Error('Case subject is required');
+    }
+    if (!payload.description) {
+      throw new Error('Case description is required');
+    }
+    return payload;
+  }
+
+  /**
+   * Validate Salesforce contact payload
+   * @param payload The payload to validate
+   * @returns Validated contact data
+   */
+  private validateSalesforceContactPayload(
+    payload: Record<string, unknown>,
+  ): any {
+    if (!payload.email) {
+      throw new Error('Contact email is required');
+    }
+    return payload;
+  }
+
+  /**
+   * Process user update notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processUserUpdate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing user update notification');
+    // Implement user update logic
+  }
+
+  /**
+   * Process application update notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processApplicationUpdate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing application update notification');
+    // Implement application update logic
+  }
+
+  /**
+   * Get Salesforce connection options
+   * @returns Salesforce connection options
+   */
+  private getSalesforceConnectionOptions(): SalesforceConnectionOptions {
+    if (!process.env.SALESFORCE_LOGIN_URL) {
+      throw new Error('SALESFORCE_LOGIN_URL is not configured');
+    }
+    if (!process.env.SALESFORCE_PRIVATE_KEY) {
+      throw new Error('SALESFORCE_PRIVATE_KEY is not configured');
+    }
+    if (!process.env.SALESFORCE_CLIENT_ID) {
+      throw new Error('SALESFORCE_CLIENT_ID is not configured');
+    }
+    if (!process.env.SALESFORCE_USERNAME) {
+      throw new Error('SALESFORCE_USERNAME is not configured');
+    }
+
+    return {
+      instanceUrl: process.env.SALESFORCE_LOGIN_URL,
+      privateKey: process.env.SALESFORCE_PRIVATE_KEY,
+      consumerKey: process.env.SALESFORCE_CLIENT_ID,
+      username: process.env.SALESFORCE_USERNAME,
+    };
   }
 }
