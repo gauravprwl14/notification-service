@@ -40,3 +40,57 @@ Thumbs.db
 
 .nx/cache
 .nx/workspace-data
+
+
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Salesforce specific
+salesforce.key
+certificates/
+
+# Temp files
+tmp/
+
+temp/
+.tmp/
+
+# NestJS specific
+.nest/
