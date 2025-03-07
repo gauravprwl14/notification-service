@@ -4,6 +4,13 @@ import { CoreModule } from '@notification-service/core';
 import { HandlersModule } from './handlers/handlers.module';
 import { ServicesModule } from './services/services.module';
 import * as Joi from 'joi';
+import { NotificationHandler } from './handlers/notification.handler';
+import {
+  configValidationSchema,
+  awsConfig,
+  redisConfig,
+  appConfig,
+} from './config/app.config';
 
 /**
  * Main Lambda processor module
@@ -32,10 +39,15 @@ import * as Joi from 'joi';
           .valid('error', 'warn', 'info', 'debug', 'verbose')
           .default('info'),
       }),
+      load: [awsConfig, redisConfig, appConfig],
+      validationOptions: {
+        abortEarly: false, // Show all validation errors at once
+      },
     }),
     CoreModule,
     HandlersModule,
     ServicesModule,
   ],
+  providers: [NotificationHandler],
 })
 export class AppModule {}

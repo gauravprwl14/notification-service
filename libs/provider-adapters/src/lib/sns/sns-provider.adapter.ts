@@ -119,6 +119,7 @@ export class SnsProviderAdapter implements NotificationProvider, OnModuleInit {
     try {
       this.logger.debug(`Sending notification event ${event.id} via SNS`);
 
+      this.logger.debug('Event Payload:', event);
       // Get the topic ARN from the provider configuration or environment variable
       const configTopicArn = config.config['topicArn'] as string | undefined;
       const envTopicArn = this.configService.get<string>('SNS_TOPIC_ARN');

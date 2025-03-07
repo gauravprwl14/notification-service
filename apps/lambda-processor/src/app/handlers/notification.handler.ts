@@ -7,6 +7,58 @@ import {
 } from '@notification-service/core';
 
 /**
+ * Interface for SNS Message structure
+ */
+interface SnsMessage {
+  Type: string;
+  MessageId: string;
+  TopicArn: string;
+  Message: string;
+  Timestamp: string;
+  MessageAttributes?: Record<string, any>;
+}
+
+/**
+ * Interface for tenant configuration
+ */
+interface TenantConfig {
+  financialInstitutionId: string;
+  appId: string;
+  environment: string;
+  features: {
+    encryption: {
+      enabled: boolean;
+      kmsKeyId?: string;
+      algorithm?: string;
+    };
+    logging: {
+      level: 'debug' | 'info' | 'warn' | 'error';
+      includePayload: boolean;
+    };
+  };
+}
+
+/**
+ * Sample tenant configuration
+ */
+const SAMPLE_TENANT_CONFIG: TenantConfig = {
+  financialInstitutionId: 'acme-bank',
+  appId: 'mobile-banking',
+  environment: 'production',
+  features: {
+    encryption: {
+      enabled: false, // Disable encryption by default
+      kmsKeyId: process.env.KMS_KEY_ID || 'default-key-id',
+      algorithm: 'AES256',
+    },
+    logging: {
+      level: 'debug',
+      includePayload: true,
+    },
+  },
+};
+
+/**
  * Handler for processing notifications in Lambda
  */
 @Injectable()
@@ -100,89 +152,160 @@ export class NotificationHandler {
   private async processRecord(record: SQSRecord): Promise<void> {
     try {
       this.logger.debug(`Processing record with ID ${record.messageId}`);
-      this.logger.debug('Record body:', record.body);
-      this.logger.debug(
-        'Record attributes:',
-        JSON.stringify(record.messageAttributes, null, 2),
-      );
+      this.logRecordDetails(record);
 
-      // First parse the SNS message envelope
-      let snsMessage: any;
-      try {
-        snsMessage = JSON.parse(record.body);
-      } catch (error) {
-        throw new Error(
-          `Failed to parse SNS message envelope as JSON: ${error.message}`,
-        );
-      }
+      const snsMessage = await this.parseSnsMessage(record);
+      const notificationEvent = await this.parseNotificationEvent(snsMessage);
 
-      // Then parse the actual notification event from the Message field
-      let notificationEvent: any;
-      try {
-        notificationEvent = JSON.parse(snsMessage.Message);
-      } catch (error) {
-        throw new Error(
-          `Failed to parse SNS Message content as JSON: ${error.message}`,
-        );
-      }
-
-      // Log the parsed notification event for debugging
-      this.logger.debug(
-        'Parsed notification event:',
-        JSON.stringify(notificationEvent, null, 2),
-      );
-
-      // Validate the notification event structure
       this.validateNotificationEvent(notificationEvent);
 
-      // Create the encryption context from the tenant information
-      const encryptionContext: EncryptionContext = {
-        financialInstitutionId: notificationEvent.tenant.financialInstitutionId,
-        appId: notificationEvent.tenant.appId,
-        environment: notificationEvent.tenant.environment,
-      };
-
-      // Decrypt the payload
-      let decryptedPayload: string;
-      try {
-        decryptedPayload = await this.encryptionService.decrypt(
-          notificationEvent.encryptedPayload,
-          encryptionContext,
-        );
-      } catch (error) {
-        throw new Error(`Failed to decrypt payload: ${error.message}`);
-      }
-
-      // Parse the decrypted payload
-      let payload: Record<string, unknown>;
-      try {
-        payload = JSON.parse(decryptedPayload);
-      } catch (error) {
-        throw new Error(
-          `Failed to parse decrypted payload as JSON: ${error.message}`,
-        );
-      }
-
-      // Process the notification based on its type
+      const payload = await this.processPayload(notificationEvent);
       await this.processNotification(notificationEvent, payload);
 
       this.logger.debug(
         `Successfully processed record with ID ${record.messageId}`,
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Failed to process record with ID ${record.messageId}: ${errorMessage}`,
-        errorStack,
-      );
-
-      // In a real implementation, we would send the failed record to a dead-letter queue
-      // For now, we'll just log the error and continue
-      throw error; // Re-throw to let the SQS subscriber handle the error
+      this.handleProcessingError(error, record.messageId);
+      throw error;
     }
+  }
+
+  /**
+   * Log record details for debugging
+   * @param record The SQS record
+   */
+  private logRecordDetails(record: SQSRecord): void {
+    this.logger.debug('Record body:', record.body);
+    this.logger.debug(
+      'Record attributes:',
+      JSON.stringify(record.messageAttributes, null, 2),
+    );
+  }
+
+  /**
+   * Parse SNS message from SQS record
+   * @param record The SQS record
+   * @returns Parsed SNS message
+   */
+  private async parseSnsMessage(record: SQSRecord): Promise<SnsMessage> {
+    try {
+      this.logger.debug('Parsing SNS message envelope as JSON');
+      this.logger.debug('SNS message envelope:', record.body);
+      const snsMessage = JSON.parse(record.body);
+      return snsMessage;
+    } catch (error) {
+      throw new Error(
+        `Failed to parse SNS message envelope as JSON: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Parse notification event from SNS message
+   * @param snsMessage The SNS message
+   * @returns Parsed notification event
+   */
+  private async parseNotificationEvent(
+    snsMessage: SnsMessage,
+  ): Promise<NotificationEvent> {
+    try {
+      const notificationEvent = JSON.parse(snsMessage.Message);
+      this.logger.debug(
+        'Parsed notification event:',
+        JSON.stringify(notificationEvent, null, 2),
+      );
+      return notificationEvent;
+    } catch (error) {
+      throw new Error(
+        `Failed to parse SNS Message content as JSON: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Process the encrypted payload
+   * @param notificationEvent The notification event
+   * @returns Parsed payload
+   */
+  private async processPayload(
+    notificationEvent: NotificationEvent,
+  ): Promise<Record<string, unknown>> {
+    const tenantConfig = SAMPLE_TENANT_CONFIG;
+
+    // If encryption is disabled, try to parse as JSON directly
+    if (!tenantConfig.features.encryption.enabled) {
+      try {
+        this.logger.debug(
+          'Encryption disabled, parsing payload as JSON directly',
+        );
+        // return JSON.parse(notificationEvent.encryptedPayload);
+        return { data: notificationEvent.encryptedPayload };
+      } catch (error) {
+        this.logger.error('Failed to parse payload as JSON:', error);
+        throw new Error(
+          `Failed to parse payload as JSON: ${error.message}. Note: Encryption is disabled, expecting plain JSON payload.`,
+        );
+      }
+    }
+
+    // If encryption is enabled, decrypt and parse
+    return this.decryptAndParsePayload(notificationEvent);
+  }
+
+  /**
+   * Decrypt and parse the payload
+   * @param notificationEvent The notification event
+   * @returns Decrypted and parsed payload
+   */
+  private async decryptAndParsePayload(
+    notificationEvent: NotificationEvent,
+  ): Promise<Record<string, unknown>> {
+    const encryptionContext: EncryptionContext = {
+      financialInstitutionId: notificationEvent.tenant.financialInstitutionId,
+      appId: notificationEvent.tenant.appId,
+      environment: notificationEvent.tenant.environment,
+    };
+
+    try {
+      this.logger.debug('Attempting to decrypt payload...');
+      const decryptedPayload = await this.encryptionService.decrypt(
+        notificationEvent.encryptedPayload,
+        encryptionContext,
+      );
+      this.logger.debug('Payload decrypted successfully');
+
+      try {
+        const parsedPayload = JSON.parse(decryptedPayload);
+        this.logger.debug('Payload parsed successfully');
+        return parsedPayload;
+      } catch (error) {
+        throw new Error(
+          `Failed to parse decrypted payload as JSON: ${error.message}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to decrypt payload:', error);
+      throw new Error(
+        `Failed to decrypt payload: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Handle processing errors
+   * @param error The error that occurred
+   * @param messageId The ID of the message that failed
+   */
+  private handleProcessingError(error: unknown, messageId: string): void {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    this.logger.error(
+      `Failed to process record with ID ${messageId}: ${errorMessage}`,
+      errorStack,
+    );
   }
 
   /**
