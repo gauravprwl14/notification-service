@@ -1,0 +1,67 @@
+{
+  "name": "lambda-processor",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/lambda-processor/src",
+  "projectType": "application",
+  "tags": [
+    "scope:lambda",
+    "type:app"
+  ],
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "target": "node",
+        "compiler": "tsc",
+        "outputPath": "dist/apps/lambda-processor",
+        "main": "apps/lambda-processor/src/main.ts",
+        "tsConfig": "apps/lambda-processor/tsconfig.app.json",
+        "assets": [
+          "apps/lambda-processor/src/assets"
+        ],
+        "isolatedConfig": true,
+        "webpackConfig": "apps/lambda-processor/webpack.config.js"
+      },
+      "configurations": {
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "inspect": false
+        },
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "buildTarget": "lambda-processor:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "lambda-processor:build:development"
+        },
+        "production": {
+          "buildTarget": "lambda-processor:build:production"
+        }
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

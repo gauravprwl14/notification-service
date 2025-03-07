@@ -1,0 +1,9 @@
+{
+  "name": "sdk",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/sdk/src",
+  "projectType": "library",
+  "tags": ["scope:sdk", "type:lib"],
+  "// targets": "to see all targets run: nx show project sdk --web",
+  "targets": {}
+}

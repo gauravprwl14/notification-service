@@ -1,0 +1,9 @@
+{
+  "name": "provider-adapters",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/provider-adapters/src",
+  "projectType": "library",
+  "tags": ["scope:providers", "type:lib"],
+  "// targets": "to see all targets run: nx show project provider-adapters --web",
+  "targets": {}
+}
