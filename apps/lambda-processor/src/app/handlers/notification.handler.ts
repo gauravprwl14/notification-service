@@ -382,23 +382,99 @@ export class NotificationHandler {
   ): Promise<void> {
     this.logger.debug('Processing Salesforce case creation');
     try {
+      // Validate the case payload before processing
       // const caseData = this.validateSalesforceCasePayload(payload);
 
+      // Enrich the payload with additional metadata
+      const enrichedPayload = {
+        tenant: event.tenant,
+        metadata: {
+          source: event.source,
+          version: event.version,
+          timestamp: new Date().toISOString(),
+          eventId: event.id,
+        },
+      };
+
+      // Send the notification event to Salesforce
       await this.salesforceEventService.sendNotificationEvent({
         type: event.type,
-        data: JSON.stringify({
-          ...payload,
-          tenant: event.tenant,
-        }),
+        data: JSON.stringify(enrichedPayload),
       });
 
-      this.logger.debug('Successfully sent Salesforce case creation event');
+      this.logger.debug('Successfully sent Salesforce case creation event', {
+        eventId: event.id,
+        type: event.type,
+        tenant: event.tenant,
+      });
     } catch (error) {
       this.logger.error(
         'Failed to send Salesforce case creation event:',
-        error,
+        error instanceof Error ? error.stack : undefined,
       );
-      throw error;
+      throw new Error(
+        `Failed to process Salesforce case creation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Process application update notification
+   * @param event The notification event
+   * @param payload The notification payload
+   */
+  private async processApplicationUpdate(
+    event: NotificationEvent,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.logger.debug('Processing application update notification');
+    try {
+      // Validate required fields for application update
+      if (!payload.applicationId) {
+        throw new Error('Application ID is required for update');
+      }
+
+      // Extract application data
+      const applicationData = {
+        applicationId: payload.applicationId,
+        status: payload.status,
+        updatedFields: payload.updatedFields || {},
+        updateReason: payload.updateReason,
+        updatedBy: payload.updatedBy,
+        ...payload,
+      };
+
+      // Enrich the payload with tenant and metadata
+      const enrichedPayload = {
+        ...applicationData,
+        tenant: event.tenant,
+        metadata: {
+          source: event.source,
+          version: event.version,
+          timestamp: new Date().toISOString(),
+          eventId: event.id,
+        },
+      };
+
+      // Send the notification event to Salesforce
+      await this.salesforceEventService.sendNotificationEvent({
+        type: event.type,
+        data: JSON.stringify(enrichedPayload),
+      });
+
+      this.logger.debug('Successfully processed application update', {
+        eventId: event.id,
+        applicationId: payload.applicationId,
+        tenant: event.tenant,
+      });
+    } catch (error) {
+      this.logger.error(
+        'Failed to process application update:',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new Error(
+        `Failed to process application update: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -407,14 +483,42 @@ export class NotificationHandler {
    * @param payload The payload to validate
    * @returns Validated case data
    */
-  private validateSalesforceCasePayload(payload: Record<string, unknown>): any {
+  private validateSalesforceCasePayload(
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> {
+    // Required fields validation
     if (!payload.subject) {
       throw new Error('Case subject is required');
     }
     if (!payload.description) {
       throw new Error('Case description is required');
     }
-    return payload;
+
+    // Type validation
+    if (typeof payload.subject !== 'string') {
+      throw new Error('Case subject must be a string');
+    }
+    if (typeof payload.description !== 'string') {
+      throw new Error('Case description must be a string');
+    }
+
+    // Extract and validate case data
+    const caseData = {
+      subject: payload.subject,
+      description: payload.description,
+      priority: payload.priority || 'Medium',
+      status: payload.status || 'New',
+      origin: payload.origin || 'Web',
+      type: payload.type,
+      category: payload.category,
+      subcategory: payload.subcategory,
+      contactEmail: payload.contactEmail,
+      contactPhone: payload.contactPhone,
+      accountId: payload.accountId,
+      ...payload,
+    };
+
+    return caseData;
   }
 
   /**
@@ -442,19 +546,6 @@ export class NotificationHandler {
   ): Promise<void> {
     this.logger.debug('Processing user update notification');
     // Implement user update logic
-  }
-
-  /**
-   * Process application update notification
-   * @param event The notification event
-   * @param payload The notification payload
-   */
-  private async processApplicationUpdate(
-    event: NotificationEvent,
-    payload: Record<string, unknown>,
-  ): Promise<void> {
-    this.logger.debug('Processing application update notification');
-    // Implement application update logic
   }
 
   /**

@@ -1,40 +1,44 @@
-const { composePlugins, withNx } = require('@nx/webpack');
-const { join } = require('path');
+const path = require('path');
+const TerserPlugin = require('terser-webpack-plugin');
+const nodeExternals = require('webpack-node-externals');
 
-module.exports = composePlugins(withNx(), (config, { options, context }) => {
-  // Update the webpack config as needed here.
-  config.resolve.extensions = ['.ts', '.js', '.json'];
-  config.target = 'node';
-
-  // Configure output
-  config.output = {
-    path: join(__dirname, '../../dist/apps/lambda-processor'),
+module.exports = {
+  target: 'node',
+  mode: 'production',
+  entry: './src/main.ts',
+  devtool: 'source-map',
+  output: {
     filename: 'main.js',
-    libraryTarget: 'commonjs'
-  };
-
-  // Configure externals - specific to AWS Lambda environment
-  config.externals = [
-    /^@nestjs\/.+$/,
-    /^@aws-sdk\/.+$/,
-    'class-transformer',
-    'class-validator',
-    'rxjs',
-    'reflect-metadata',
-    /^bull$/,
-    /^ioredis$/,
-    /^jsonwebtoken$/,
-    /^fs-extra$/,
-    // AWS Lambda specific modules
-    'aws-lambda',
-    // Handle other node_modules
-    ({ context, request }, callback) => {
-      if (/^[a-z\-0-9]+$/.test(request)) {
-        return callback(null, 'commonjs ' + request);
-      }
-      callback();
-    }
-  ];
-
-  return config;
-});
+    path: path.resolve(__dirname, 'dist'),
+    libraryTarget: 'commonjs2',
+  },
+  resolve: {
+    extensions: ['.ts', '.js'],
+    alias: {
+      '@notification-service/core': path.resolve(__dirname, '../../libs/core/src'),
+      '@notification-service/salesforce-integration': path.resolve(__dirname, '../../libs/salesforce-integration/src'),
+    },
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        use: 'ts-loader',
+        exclude: /node_modules/,
+      },
+    ],
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          keep_classnames: true,
+          keep_fnames: true,
+        },
+      }),
+    ],
+  },
+  externals: [nodeExternals()],
+  plugins: [],
+};

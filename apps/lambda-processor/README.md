@@ -220,4 +220,92 @@ If SQS message processing fails:
 - `@nestjs/config`: Configuration management
 - `@aws-sdk/client-sqs`: AWS SQS client
 - `@aws-sdk/client-kms`: AWS KMS client
-- `aws-lambda`: AWS Lambda types and utilities 
+- `aws-lambda`: AWS Lambda types and utilities
+
+# Lambda Processor Deployment
+
+This directory contains the Lambda processor for the notification service and a script to deploy it to AWS Lambda.
+
+## Prerequisites
+
+- Node.js 18 or later
+- npm
+- AWS CLI configured with appropriate credentials
+- AWS account with permissions to create Lambda functions, IAM roles, and SQS triggers
+
+## Deployment Steps
+
+1. **Setup your environment**
+
+   Make sure you have the AWS CLI installed and configured:
+   ```bash
+   aws configure
+   ```
+
+2. **Build and deploy the Lambda function**
+
+   Run the deployment script:
+   ```bash
+   ./deploy-lambda.sh
+   ```
+
+   This script will:
+   - Create a package.json and tsconfig.json if they don't exist
+   - Build the Lambda function using TypeScript
+   - Create a deployment package
+   - Deploy to AWS Lambda
+   - Offer to set up SQS triggers
+
+3. **Custom deployment options**
+
+   You can specify a custom Lambda name and AWS region:
+   ```bash
+   ./deploy-lambda.sh my-lambda-name us-west-2
+   ```
+
+## Environment Variables
+
+After deployment, set these environment variables in the AWS Lambda console:
+
+- `AWS_REGION`: AWS region
+- `AWS_ACCESS_KEY_ID`: AWS access key
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key
+- `SQS_QUEUE_URL`: SQS queue URL
+- `SQS_DLQ_URL`: SQS dead-letter queue URL
+- `KMS_KEY_ID`: KMS key ID for encryption
+- `REDIS_HOST`: Redis host
+- `REDIS_PORT`: Redis port
+- `SALESFORCE_CLIENT_ID`: Salesforce client ID
+- `SALESFORCE_USERNAME`: Salesforce username
+- `SALESFORCE_PRIVATE_KEY_PATH`: Path to Salesforce private key
+
+## Development
+
+To develop locally:
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Build the project:
+   ```bash
+   npm run build
+   ```
+
+3. Package for deployment:
+   ```bash
+   npm run package
+   ```
+
+## Troubleshooting
+
+- **Deployment fails with SSL errors**: Try setting SSL certificates manually:
+  ```bash
+  export SSL_CERT_FILE=/path/to/cert.pem
+  export REQUESTS_CA_BUNDLE=/path/to/cert.pem
+  ```
+
+- **Package too large**: Use Lambda layers for dependencies or optimize your code further.
+
+- **Lambda function not triggering**: Check the SQS trigger configuration and Lambda permissions. 
