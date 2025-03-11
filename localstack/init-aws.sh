@@ -2,6 +2,7 @@
 
 # Set default values for environment variables
 AWS_REGION=${AWS_REGION:-us-east-1}
+AWS_PROFILE=${AWS_PROFILE:-localstack}
 SNS_TOPIC_NAME=${SNS_TOPIC_NAME:-notification-events}
 SNS_DLQ_TOPIC_NAME=${SNS_DLQ_TOPIC_NAME:-notification-dlq}
 SQS_QUEUE_NAME=${SQS_QUEUE_NAME:-notification-queue}

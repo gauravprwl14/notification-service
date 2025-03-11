@@ -65,11 +65,11 @@ export class SqsSubscriberService implements OnModuleInit {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
-    while (this.isProcessing) {
-      await this.pollQueues();
-      // Add a small delay to prevent tight polling
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    // while (this.isProcessing) {
+    //   await this.pollQueues();
+    //   // Add a small delay to prevent tight polling
+    //   await new Promise((resolve) => setTimeout(resolve, 100));
+    // }
   }
 
   private async pollQueues() {

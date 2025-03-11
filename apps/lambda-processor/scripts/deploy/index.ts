@@ -121,6 +121,7 @@ async function deploy(config: DeploymentConfig): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '');
     const deployDir = resolve(config.deployDir, timestamp);
     const layerDir = resolve(deployDir, 'layer');
+    const functionDir = resolve(deployDir, 'function');
 
     // Prepare production dependencies for layer
     await prepareProductionDependencies(config.rootDir, layerDir);
@@ -137,10 +138,21 @@ async function deploy(config: DeploymentConfig): Promise<void> {
       code: readFileSync(layerZip),
     });
 
+    // Prepare function directory with dist files and essential dependencies
+    logger.info('Preparing function package with essential dependencies...');
+    execSync(`mkdir -p ${functionDir}`);
+    execSync(`cp -r ${resolve(config.rootDir, 'dist')}/* ${functionDir}/`);
+
+    // Copy essential dependencies (tslib)
+    execSync(`mkdir -p ${functionDir}/node_modules/tslib`);
+    execSync(
+      `cp -r ${resolve(layerDir, 'node_modules/tslib')}/* ${functionDir}/node_modules/tslib/`,
+    );
+
     // Create Lambda function package
     logger.info('Creating function package...');
     const functionZip = await createFunctionPackage(
-      config.sourceDir,
+      functionDir,
       resolve(deployDir, 'function.zip'),
     );
 
@@ -177,7 +189,7 @@ async function deploy(config: DeploymentConfig): Promise<void> {
     // Cleanup
     try {
       logger.info('Cleaning up temporary files...');
-      execSync(`rm -rf ${config.deployDir}/*`);
+      // execSync(`rm -rf ${config.deployDir}/*`);
     } catch (error) {
       logger.warn('Failed to clean up temporary files:', error);
     }

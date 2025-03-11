@@ -105,7 +105,7 @@ const defaultConfig: Partial<DeploymentConfig> = {
     memorySize: parseInt(process.env.APP_MEMORY_SIZE || '256', 10),
     timeout: parseInt(process.env.APP_TIMEOUT || '30', 10),
     runtime: process.env.APP_RUNTIME || 'nodejs18.x',
-    handler: process.env.APP_HANDLER || 'dist/main.handler',
+    handler: process.env.APP_HANDLER || 'main.handler',
     environment: {},
   },
 };
@@ -125,7 +125,7 @@ export function createConfig(args: CommandLineArgs): DeploymentConfig {
     environment,
     rootDir,
     deployDir: resolve(rootDir, 'deployments'),
-    sourceDir: resolve(rootDir, 'src'),
+    sourceDir: resolve(rootDir, 'dist'),
     lambda: {
       ...defaultConfig.lambda,
       memorySize: args.memorySize

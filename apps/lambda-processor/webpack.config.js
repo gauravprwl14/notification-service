@@ -1,6 +1,5 @@
 const path = require('path');
 const TerserPlugin = require('terser-webpack-plugin');
-const nodeExternals = require('webpack-node-externals');
 
 module.exports = {
   target: 'node',
@@ -17,13 +16,21 @@ module.exports = {
     alias: {
       '@notification-service/core': path.resolve(__dirname, '../../libs/core/src'),
       '@notification-service/salesforce-integration': path.resolve(__dirname, '../../libs/salesforce-integration/src'),
-    },
+    }
   },
   module: {
     rules: [
       {
         test: /\.ts$/,
-        use: 'ts-loader',
+        use: [
+          {
+            loader: 'ts-loader',
+            options: {
+              transpileOnly: true,
+              configFile: path.resolve(__dirname, 'tsconfig.json')
+            }
+          }
+        ],
         exclude: /node_modules/,
       },
     ],
@@ -39,6 +46,12 @@ module.exports = {
       }),
     ],
   },
-  externals: [nodeExternals()],
+  // Don't exclude any node_modules - bundle everything
+  externals: [],
   plugins: [],
+  stats: {
+    errorDetails: true,
+    children: true,
+    warnings: true
+  }
 };
