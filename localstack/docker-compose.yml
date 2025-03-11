@@ -9,7 +9,7 @@ services:
     ports:
       - '4566:4566'
     environment:
-      - SERVICES=sns,sqs,kms,lambda
+      - SERVICES=sns,sqs,kms,lambda,iam
       - DEBUG=1
       - DATA_DIR=$HOME/Sites/projects/ga/tyfone/notification-service/tmp/localstack/data
       - AWS_DEFAULT_REGION=us-east-1

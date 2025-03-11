@@ -191,6 +191,21 @@ export async function createFunctionPackage(
   sourceDir: string,
   outputFile: string,
 ): Promise<string> {
+  // Log the contents of the source directory
+  logger.info(`Creating function package from ${sourceDir}`);
+
+  try {
+    const files = await readdir(sourceDir, { withFileTypes: true });
+    logger.info('Files in source directory:');
+    for (const file of files) {
+      const filePath = resolve(sourceDir, file.name);
+      const stats = await stat(filePath);
+      logger.info(`- ${file.name} (${stats.size} bytes)`);
+    }
+  } catch (error) {
+    logger.error('Error reading source directory:', error);
+  }
+
   return createZip({
     sourceDir,
     outputFile,

@@ -9,6 +9,45 @@ SQS_QUEUE_NAME=${SQS_QUEUE_NAME:-notification-queue}
 SQS_DLQ_NAME=${SQS_DLQ_NAME:-notification-dlq}
 AWS_ENDPOINT=${AWS_ENDPOINT:-http://localhost:4566}
 
+# Create IAM role for Lambda
+echo "Creating IAM role for Lambda..."
+aws --endpoint-url=${AWS_ENDPOINT} iam create-role \
+  --role-name lambda-notification-processor-dev-role \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+# Create and attach IAM policies
+echo "Creating and attaching IAM policies..."
+aws --endpoint-url=${AWS_ENDPOINT} iam put-role-policy \
+  --role-name lambda-notification-processor-dev-role \
+  --policy-name lambda-notification-processor-policy \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "sqs:*",
+          "sns:*",
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }'
+
 # Create SNS topics
 echo "Creating SNS topics..."
 aws --endpoint-url=${AWS_ENDPOINT} sns create-topic --name ${SNS_TOPIC_NAME}

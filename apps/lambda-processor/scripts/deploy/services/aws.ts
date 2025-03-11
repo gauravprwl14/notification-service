@@ -69,7 +69,7 @@ export class AWSService {
   private readonly MAX_RETRIES = 5;
   private readonly INITIAL_BACKOFF_MS = 2000;
   private readonly STATE_CHECK_INTERVAL_MS = 3000;
-  private readonly MAX_STATE_CHECK_ATTEMPTS = 20;
+  private readonly MAX_STATE_CHECK_ATTEMPTS = 2;
 
   /**
    * Creates an instance of AWSService
