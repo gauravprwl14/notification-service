@@ -144,7 +144,14 @@ async function deploy(config: DeploymentConfig): Promise<void> {
     execSync(`cp -r ${resolve(config.rootDir, 'dist')}/* ${functionDir}/`);
 
     // Copy essential dependencies (tslib)
-    execSync(`mkdir -p ${functionDir}/node_modules/tslib`);
+    logger.info('Creating node modules dependencies...');
+    execSync(`mkdir -p ${functionDir}/node_modules`);
+    logger.info('Copying node modules dependencies...');
+    execSync(
+      `cp -r ${resolve(layerDir, 'node_modules')}/* ${functionDir}/node_modules`,
+    );
+    logger.info('Copying tslib dependencies...');
+    
     execSync(
       `cp -r ${resolve(layerDir, 'node_modules/tslib')}/* ${functionDir}/node_modules/tslib/`,
     );
