@@ -19,6 +19,7 @@ import {
 export class SqsSubscriberService implements OnModuleInit {
   private readonly logger = new Logger(SqsSubscriberService.name);
   private sqsClient: SQSClient;
+  private isDev: Boolean;
   private queueUrls: string[] = [];
   private isProcessing = false;
 
@@ -29,7 +30,9 @@ export class SqsSubscriberService implements OnModuleInit {
     // Initialize SQS client
     const region = this.configService.get<string>('AWS_REGION');
     const endpoint = this.configService.get<string>('AWS_ENDPOINT');
-
+    this.isDev =
+      this.configService.get<string>('NODE_ENV') === 'development' ||
+      this.configService.get<string>('NODE_ENV') === 'dev';
     this.sqsClient = new SQSClient({
       region,
       endpoint,
@@ -65,11 +68,13 @@ export class SqsSubscriberService implements OnModuleInit {
     if (this.isProcessing) return;
     this.isProcessing = true;
 
-    // while (this.isProcessing) {
-    //   await this.pollQueues();
-    //   // Add a small delay to prevent tight polling
-    //   await new Promise((resolve) => setTimeout(resolve, 100));
-    // }
+    if (this.isDev) {
+      while (this.isProcessing) {
+        await this.pollQueues();
+        // Add a small delay to prevent tight polling
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
   }
 
   private async pollQueues() {
