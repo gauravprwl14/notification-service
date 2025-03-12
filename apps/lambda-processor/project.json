@@ -30,21 +30,20 @@
         "development": {
           "optimization": false,
           "extractLicenses": false,
-          "inspect": false
+          "inspect": false,
+          "sourceMap": true
         },
         "production": {
           "optimization": true,
           "extractLicenses": true,
-          "inspect": false
+          "inspect": false,
+          "sourceMap": false
         }
       }
     },
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": [
-        "build"
-      ],
       "options": {
         "buildTarget": "lambda-processor:build",
         "runBuildTargetDependencies": false
