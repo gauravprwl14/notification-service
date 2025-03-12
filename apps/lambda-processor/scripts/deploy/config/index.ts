@@ -4,6 +4,7 @@
 
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { logger } from '../utils/logger';
 
 // Load environment variables from .env file
 config();
@@ -71,7 +72,10 @@ function getLambdaEnvironment(environment: string): Record<string, string> {
 
   // Base environment variables
   const envVars: Record<string, string> = {
-    NODE_ENV: environment === 'prod' ? 'production' : environment,
+    NODE_ENV:
+      environment === 'prod'
+        ? 'production'
+        : process.env.NODE_ENV || environment,
     LOG_LEVEL: process.env.APP_LOG_LEVEL || 'info',
     DEPLOYMENT_TIMESTAMP: new Date().toISOString(),
   };
@@ -99,7 +103,7 @@ function getLambdaEnvironment(environment: string): Record<string, string> {
 const defaultConfig: Partial<DeploymentConfig> = {
   region: process.env.AWS_REGION || 'us-east-1',
   profile: process.env.AWS_PROFILE || 'default',
-  environment: 'dev',
+  environment: process.env.APP_ENVIRONMENT || 'dev',
   baseFunctionName: process.env.APP_FUNCTION_NAME || 'notification-processor',
   lambda: {
     memorySize: parseInt(process.env.APP_MEMORY_SIZE || '256', 10),
@@ -137,6 +141,8 @@ export function createConfig(args: CommandLineArgs): DeploymentConfig {
       environment: getLambdaEnvironment(environment),
     },
   } as DeploymentConfig;
+
+  logger.info(`Config: ${JSON.stringify(config, null, 2)}`);
 
   return config;
 }
