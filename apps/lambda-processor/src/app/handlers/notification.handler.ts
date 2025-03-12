@@ -232,17 +232,37 @@ export class NotificationHandler {
   private async parseNotificationEvent(
     snsMessage: SnsMessage,
   ): Promise<NotificationEvent> {
+    this.logger.debug('Parsing notification event from SNS message');
+    this.logger.debug(
+      'SNS message content:',
+      JSON.stringify(snsMessage, null, 2),
+    );
+
     try {
-      const notificationEvent = JSON.parse(snsMessage.Message);
+      let notificationEvent;
+
+      // Check if we're dealing with LocalStack (SNS-wrapped) or direct AWS Lambda event
+      if (snsMessage.Type === 'Notification' && snsMessage.Message) {
+        // LocalStack format: SNS-wrapped message
+        this.logger.debug('Detected LocalStack SNS-wrapped format');
+        notificationEvent = JSON.parse(snsMessage.Message);
+      } else {
+        // AWS format: direct event JSON
+        this.logger.debug('Detected AWS direct event format');
+        notificationEvent = snsMessage;
+      }
+
       this.logger.debug(
         'Parsed notification event:',
         JSON.stringify(notificationEvent, null, 2),
       );
+
       return notificationEvent;
     } catch (error) {
-      throw new Error(
-        `Failed to parse SNS Message content as JSON: ${error.message}`,
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Failed to parse notification event:', errorMessage);
+      throw new Error(`Failed to parse notification event: ${errorMessage}`);
     }
   }
 
