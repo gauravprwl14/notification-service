@@ -141,7 +141,7 @@ async function deploy(config: DeploymentConfig): Promise<void> {
     // Prepare function directory with dist files and essential dependencies
     logger.info('Preparing function package with essential dependencies...');
     execSync(`mkdir -p ${functionDir}`);
-    execSync(`cp -r ${resolve(config.rootDir, 'dist')}/* ${functionDir}/`);
+    execSync(`cp -r ${resolve(config.rootDir, '../../dist/apps/lambda-processor')}/* ${functionDir}/`);
 
     // Copy essential dependencies (tslib)
     logger.info('Creating node modules dependencies...');
