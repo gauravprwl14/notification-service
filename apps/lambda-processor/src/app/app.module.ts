@@ -28,12 +28,12 @@ import {
         AWS_ACCESS_KEY_ID: Joi.string().required(),
         AWS_SECRET_ACCESS_KEY: Joi.string().required(),
         AWS_ENDPOINT: Joi.string().optional(),
-        SQS_QUEUE_URL: Joi.string().required(),
-        SQS_DLQ_URL: Joi.string().required(),
+        SQS_QUEUE_URL: Joi.string().optional(),
+        SQS_DLQ_URL: Joi.string().optional(),
         ADDITIONAL_SQS_QUEUES: Joi.string().optional().default(''),
         KMS_KEY_ID: Joi.string().required(),
-        REDIS_HOST: Joi.string().required(),
-        REDIS_PORT: Joi.number().default(6379),
+        // REDIS_HOST: Joi.string().required(),
+        // REDIS_PORT: Joi.number().default(6379),
         LOG_LEVEL: Joi.string()
           .valid('error', 'warn', 'info', 'debug', 'verbose')
           .default('info'),
