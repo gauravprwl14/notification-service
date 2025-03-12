@@ -351,7 +351,7 @@ export class NotificationHandler {
           await this.processSalesforceCaseCreate(event, payload);
           break;
         case NotificationType.APPLICATION_UPDATE:
-          await this.processApplicationUpdate(event, payload);
+          await this.processSalesforceCaseCreate(event, payload);
           break;
         default:
           this.logger.warn(`Unknown notification type: ${event.type}`);
@@ -387,13 +387,14 @@ export class NotificationHandler {
 
       // Enrich the payload with additional metadata
       const enrichedPayload = {
-        tenant: event.tenant,
-        metadata: {
-          source: event.source,
-          version: event.version,
-          timestamp: new Date().toISOString(),
-          eventId: event.id,
-        },
+        // tenant: event.tenant,
+        // metadata: {
+        //   source: event.source,
+        //   version: event.version,
+        //   timestamp: new Date().toISOString(),
+        //   eventId: event.id,
+        // },
+        ...event,
       };
 
       // Send the notification event to Salesforce
@@ -402,10 +403,12 @@ export class NotificationHandler {
         data: JSON.stringify(enrichedPayload),
       });
 
-      this.logger.debug('Successfully sent Salesforce case creation event', {
-        eventId: event.id,
-        type: event.type,
-        tenant: event.tenant,
+      this.logger.debug('Successfully sent Salesforce event', {
+        // eventId: event.id,
+        // type: event.type,
+        // tenant: event.tenant,
+        // payload: event.encryptedPayload,
+        event,
       });
     } catch (error) {
       this.logger.error(
