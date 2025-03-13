@@ -12,6 +12,7 @@ import {
   NotificationSendResult,
   ProviderType,
   retryConnection,
+  ProviderError,
 } from '@notification-service/core';
 
 /**
@@ -126,9 +127,7 @@ export class SnsProviderAdapter implements NotificationProvider, OnModuleInit {
       const topicArn = configTopicArn || envTopicArn;
 
       if (!topicArn) {
-        throw new Error(
-          'Missing topicArn in provider configuration and SNS_TOPIC_ARN environment variable',
-        );
+        throw ProviderError.configMissing('topicArn', 'AWS SNS');
       }
 
       // Check if this is a FIFO topic
@@ -142,27 +141,27 @@ export class SnsProviderAdapter implements NotificationProvider, OnModuleInit {
         },
         eventType: {
           DataType: 'String',
-          StringValue: event.type,
+          StringValue: event.header.event_name,
         },
         eventVersion: {
           DataType: 'String',
-          StringValue: event.version,
+          StringValue: event.header.event_version,
         },
         source: {
           DataType: 'String',
-          StringValue: event.source,
+          StringValue: event.payload.activityBy.source,
         },
         financialInstitutionId: {
           DataType: 'String',
-          StringValue: event.tenant.financialInstitutionId,
+          StringValue: event.header.tenant.financialInstitutionId,
         },
         appId: {
           DataType: 'String',
-          StringValue: event.tenant.appId,
+          StringValue: event.header.tenant.appId,
         },
         environment: {
           DataType: 'String',
-          StringValue: event.tenant.environment,
+          StringValue: event.header.tenant.environment,
         },
       };
 
@@ -172,9 +171,7 @@ export class SnsProviderAdapter implements NotificationProvider, OnModuleInit {
         Message: JSON.stringify(event),
         MessageAttributes: messageAttributes,
         ...(isFifoTopic && {
-          // For FIFO topics, use a combination of tenant and event info as the group ID
-          MessageGroupId: `${event.tenant.financialInstitutionId}-${event.tenant.appId}-${event.type}`,
-          // Use event ID as deduplication ID to ensure exactly-once delivery
+          MessageGroupId: `${event.header.tenant.financialInstitutionId}-${event.header.tenant.appId}-${event.header.event_name}`,
           MessageDeduplicationId: event.id,
         }),
       });
@@ -205,22 +202,16 @@ export class SnsProviderAdapter implements NotificationProvider, OnModuleInit {
         },
       };
     } catch (error) {
-      // Type guard for error object
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
       this.logger.error(
-        `Failed to send notification event ${event.id} via SNS: ${errorMessage}`,
-        errorStack,
+        `Failed to send notification event ${event.id} via SNS`,
+        error instanceof Error ? error.stack : undefined,
       );
 
-      // Return the error result
-      return {
-        success: false,
-        error: errorMessage,
-        timestamp: new Date().toISOString(),
-      };
+      throw ProviderError.operationFailed(
+        'publish',
+        'AWS SNS',
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 }

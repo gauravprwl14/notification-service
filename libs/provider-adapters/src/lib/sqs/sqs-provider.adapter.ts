@@ -12,6 +12,7 @@ import {
   NotificationSendResult,
   ProviderType,
   retryConnection,
+  ProviderError,
 } from '@notification-service/core';
 
 /**
@@ -125,9 +126,7 @@ export class SqsProviderAdapter implements NotificationProvider, OnModuleInit {
       const queueUrl = configQueueUrl || envQueueUrl;
 
       if (!queueUrl) {
-        throw new Error(
-          'Missing queueUrl in provider configuration and SQS_QUEUE_URL environment variable',
-        );
+        throw ProviderError.configMissing('queueUrl', 'AWS SQS');
       }
 
       // Create the message attributes
@@ -138,27 +137,27 @@ export class SqsProviderAdapter implements NotificationProvider, OnModuleInit {
         },
         eventType: {
           DataType: 'String',
-          StringValue: event.type,
+          StringValue: event.header.event_name,
         },
         eventVersion: {
           DataType: 'String',
-          StringValue: event.version,
+          StringValue: event.header.event_version,
         },
         source: {
           DataType: 'String',
-          StringValue: event.source,
+          StringValue: event.payload.activityBy.source,
         },
         financialInstitutionId: {
           DataType: 'String',
-          StringValue: event.tenant.financialInstitutionId,
+          StringValue: event.header.tenant.financialInstitutionId,
         },
         appId: {
           DataType: 'String',
-          StringValue: event.tenant.appId,
+          StringValue: event.header.tenant.appId,
         },
         environment: {
           DataType: 'String',
-          StringValue: event.tenant.environment,
+          StringValue: event.header.tenant.environment,
         },
       };
 
@@ -195,23 +194,17 @@ export class SqsProviderAdapter implements NotificationProvider, OnModuleInit {
           md5OfMessageBody: response.MD5OfMessageBody,
         },
       };
-    } catch (error: unknown) {
-      // Type guard for error object
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
+    } catch (error) {
       this.logger.error(
-        `Failed to send notification event ${event.id} via SQS: ${errorMessage}`,
-        errorStack,
+        `Failed to send notification event ${event.id} via SQS`,
+        error instanceof Error ? error.stack : undefined,
       );
 
-      // Return the error result
-      return {
-        success: false,
-        error: errorMessage,
-        timestamp: new Date().toISOString(),
-      };
+      throw ProviderError.operationFailed(
+        'publish',
+        'AWS SQS',
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 }
