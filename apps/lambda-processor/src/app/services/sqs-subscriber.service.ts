@@ -28,7 +28,7 @@ export class SqsSubscriberService implements OnModuleInit {
     private readonly notificationHandler: NotificationHandler,
   ) {
     // Initialize SQS client
-    const region = this.configService.get<string>('AWS_REGION');
+    const region = this.configService.getOrThrow<string>('AWS_REGION');
     const endpoint = this.configService.get<string>('AWS_ENDPOINT');
     this.isDev =
       this.configService.get<string>('NODE_ENV') === 'development' ||
@@ -45,7 +45,7 @@ export class SqsSubscriberService implements OnModuleInit {
     });
 
     // Get queue URLs
-    const mainQueueUrl = this.configService.get<string>('SQS_QUEUE_URL');
+    const mainQueueUrl = this.configService.getOrThrow<string>('SQS_QUEUE_URL');
     const additionalQueues = this.configService.get<string>(
       'ADDITIONAL_SQS_QUEUES',
       '',
@@ -111,8 +111,6 @@ export class SqsSubscriberService implements OnModuleInit {
    * Convert AWS SQS Message to SQSRecord format
    */
   private convertToSQSRecord(message: Message, queueUrl: string): SQSRecord {
-    const region = this.configService.get<string>('AWS_REGION');
-
     // Convert message attributes to the expected format
     const messageAttributes = this.convertMessageAttributes(
       message.MessageAttributes,
@@ -137,7 +135,7 @@ export class SqsSubscriberService implements OnModuleInit {
       md5OfBody: message.MD5OfBody || '',
       eventSource: 'aws:sqs',
       eventSourceARN: queueUrl,
-      awsRegion: region,
+      awsRegion: this.configService.getOrThrow<string>('AWS_REGION'),
     };
   }
 
