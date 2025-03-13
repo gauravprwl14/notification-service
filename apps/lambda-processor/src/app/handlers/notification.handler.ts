@@ -2,8 +2,8 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { SQSEvent, SQSRecord } from 'aws-lambda';
 import {
   NotificationEvent,
-  EncryptionService,
-  EncryptionContext,
+  KmsEncryptionService as EncryptionService,
+  NotificationError,
 } from '@notification-service/core';
 import { SalesforceEventService } from '@notification-service/salesforce-integration';
 
@@ -121,50 +121,143 @@ export class NotificationHandler {
   /**
    * Validate the notification event structure
    * @param event The notification event to validate
-   * @throws Error if the event is invalid
+   * @throws NotificationError if the event is invalid
+   * @returns true if the event is valid
    */
-  private validateNotificationEvent(event: any): event is NotificationEvent {
+  private validateNotificationEvent(
+    event: any,
+  ): event is NotificationEvent<Record<string, unknown>> {
     this.logger.debug('Validating notification event:', JSON.stringify(event));
-    if (!event) {
-      throw new Error('Notification event is null or undefined');
-    }
 
-    if (!event.id) {
-      throw new Error('Notification event is missing id');
-    }
-
-    if (!event.type) {
-      throw new Error('Notification event is missing type');
-    }
-
-    if (!event.version) {
-      throw new Error('Notification event is missing version');
-    }
-
-    if (!event.source) {
-      throw new Error('Notification event is missing source');
-    }
-
-    if (!event.tenant) {
-      throw new Error('Notification event is missing tenant information');
-    }
-
-    const requiredTenantFields = [
-      'financialInstitutionId',
-      'appId',
-      'environment',
-    ];
-    for (const field of requiredTenantFields) {
-      if (!event.tenant[field]) {
-        throw new Error(`Notification event tenant is missing ${field}`);
+    try {
+      // Check if event exists
+      if (!event) {
+        throw NotificationError.invalidEvent(
+          'Notification event is null or undefined',
+        );
       }
-    }
 
-    if (!event.encryptedPayload) {
-      throw new Error('Notification event is missing encryptedPayload');
-    }
+      // Validate required top-level fields
+      if (!event.id) {
+        throw NotificationError.invalidEvent('Missing required field: id');
+      }
 
-    return true;
+      if (!event.header) {
+        throw NotificationError.invalidEvent('Missing required field: header');
+      }
+
+      if (!event.payload) {
+        throw NotificationError.invalidEvent('Missing required field: payload');
+      }
+
+      // Validate header fields
+      const requiredHeaderFields = [
+        'event_name',
+        'product',
+        'product_version',
+        'event_version',
+        'key_handle',
+        'timestamp',
+        'callback_ref',
+        'alg',
+        'typ',
+        'tenant',
+      ];
+
+      for (const field of requiredHeaderFields) {
+        if (!event.header[field]) {
+          throw NotificationError.invalidEvent(
+            `Missing required header field: ${field}`,
+          );
+        }
+      }
+
+      // Validate tenant information
+      const requiredTenantFields = [
+        'financialInstitutionId',
+        'appId',
+        'environment',
+      ];
+
+      for (const field of requiredTenantFields) {
+        if (!event.header.tenant[field]) {
+          throw NotificationError.invalidEvent(
+            `Missing required tenant field: ${field}`,
+          );
+        }
+      }
+
+      // Validate payload structure
+      if (!event.payload.metadata) {
+        throw NotificationError.invalidEvent(
+          'Missing required payload field: metadata',
+        );
+      }
+
+      if (!event.payload.data) {
+        throw NotificationError.invalidEvent(
+          'Missing required payload field: data',
+        );
+      }
+
+      if (!event.payload.activityBy) {
+        throw NotificationError.invalidEvent(
+          'Missing required payload field: activityBy',
+        );
+      }
+
+      // Validate metadata fields
+      const requiredMetadataFields = [
+        'docker_container_id',
+        'fi_id',
+        'config_version',
+        'context',
+      ];
+
+      for (const field of requiredMetadataFields) {
+        if (!event.payload.metadata[field]) {
+          throw NotificationError.invalidEvent(
+            `Missing required metadata field: ${field}`,
+          );
+        }
+      }
+
+      // Validate metadata context fields
+      const requiredContextFields = [
+        'deviceId',
+        'ip_address',
+        'user_agent',
+        'hostname',
+        'language',
+      ];
+
+      for (const field of requiredContextFields) {
+        if (!event.payload.metadata.context[field]) {
+          throw NotificationError.invalidEvent(
+            `Missing required metadata context field: ${field}`,
+          );
+        }
+      }
+
+      // Validate activityBy fields
+      const requiredActivityFields = ['source', 'identifier', 'metadata'];
+      for (const field of requiredActivityFields) {
+        if (!event.payload.activityBy[field]) {
+          throw NotificationError.invalidEvent(
+            `Missing required activityBy field: ${field}`,
+          );
+        }
+      }
+
+      this.logger.debug('Notification event validation successful');
+      return true;
+    } catch (error) {
+      this.logger.error(
+        'Notification event validation failed:',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -217,9 +310,10 @@ export class NotificationHandler {
       this.logger.debug('SNS message envelope:', record.body);
       const snsMessage = JSON.parse(record.body);
       return snsMessage;
-    } catch (error) {
-      throw new Error(
-        `Failed to parse SNS message envelope as JSON: ${error.message}`,
+    } catch (err) {
+      throw NotificationError.invalidEvent(
+        `Failed to parse SNS message envelope as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        { recordId: record.messageId },
       );
     }
   }
@@ -276,23 +370,20 @@ export class NotificationHandler {
   ): Promise<Record<string, unknown>> {
     const tenantConfig = SAMPLE_TENANT_CONFIG;
 
-    // If encryption is disabled, try to parse as JSON directly
     if (!tenantConfig.features.encryption.enabled) {
       try {
         this.logger.debug(
           'Encryption disabled, parsing payload as JSON directly',
         );
-        // return JSON.parse(notificationEvent.encryptedPayload);
-        return { data: notificationEvent.encryptedPayload };
-      } catch (error) {
-        this.logger.error('Failed to parse payload as JSON:', error);
-        throw new Error(
-          `Failed to parse payload as JSON: ${error.message}. Note: Encryption is disabled, expecting plain JSON payload.`,
+        return { data: notificationEvent.payload.data };
+      } catch (err) {
+        throw NotificationError.invalidEvent(
+          `Failed to parse payload as JSON: ${err instanceof Error ? err.message : 'Unknown error'}. Note: Encryption is disabled, expecting plain JSON payload.`,
+          { eventId: notificationEvent.id },
         );
       }
     }
 
-    // If encryption is enabled, decrypt and parse
     return this.decryptAndParsePayload(notificationEvent);
   }
 
@@ -304,16 +395,17 @@ export class NotificationHandler {
   private async decryptAndParsePayload(
     notificationEvent: NotificationEvent,
   ): Promise<Record<string, unknown>> {
-    const encryptionContext: EncryptionContext = {
-      financialInstitutionId: notificationEvent.tenant.financialInstitutionId,
-      appId: notificationEvent.tenant.appId,
-      environment: notificationEvent.tenant.environment,
+    const encryptionContext = {
+      financialInstitutionId:
+        notificationEvent.header.tenant.financialInstitutionId,
+      appId: notificationEvent.header.tenant.appId,
+      environment: notificationEvent.header.tenant.environment,
     };
 
     try {
       this.logger.debug('Attempting to decrypt payload...');
       const decryptedPayload = await this.encryptionService.decrypt(
-        notificationEvent.encryptedPayload,
+        notificationEvent.payload.data as string,
         encryptionContext,
       );
       this.logger.debug('Payload decrypted successfully');
@@ -322,15 +414,16 @@ export class NotificationHandler {
         const parsedPayload = JSON.parse(decryptedPayload);
         this.logger.debug('Payload parsed successfully');
         return parsedPayload;
-      } catch (error) {
-        throw new Error(
-          `Failed to parse decrypted payload as JSON: ${error.message}`,
+      } catch (err) {
+        throw NotificationError.invalidEvent(
+          `Failed to parse decrypted payload as JSON: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          { eventId: notificationEvent.id },
         );
       }
-    } catch (error) {
-      this.logger.error('Failed to decrypt payload:', error);
-      throw new Error(
-        `Failed to decrypt payload: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    } catch (err) {
+      throw NotificationError.sendFailed(
+        err instanceof Error ? err : new Error('Failed to decrypt payload'),
+        { eventId: notificationEvent.id },
       );
     }
   }
@@ -362,29 +455,33 @@ export class NotificationHandler {
     payload: Record<string, unknown>,
   ): Promise<void> {
     try {
-      this.logger.debug(`Processing notification of type ${event.type}`);
+      this.logger.debug(
+        `Processing notification of type ${event.header.event_name}`,
+      );
       this.logger.debug(`Notification payload: ${JSON.stringify(payload)}`);
 
       // Add specific handling for different event types
-      switch (event.type) {
+      switch (event.header.event_name) {
         case NotificationType.APPLICATION_CREATE:
           await this.processSalesforceCaseCreate(event, payload);
           break;
         case NotificationType.APPLICATION_UPDATE:
-          await this.processSalesforceCaseCreate(event, payload);
+          await this.processApplicationUpdate(event, payload);
           break;
         default:
-          this.logger.warn(`Unknown notification type: ${event.type}`);
+          this.logger.warn(
+            `Unknown notification type: ${event.header.event_name}`,
+          );
       }
 
       this.logger.debug(
-        `Finished processing notification of type ${event.type}`,
+        `Finished processing notification of type ${event.header.event_name}`,
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
-        `Error processing notification of type ${event.type}: ${errorMessage}`,
+        `Error processing notification of type ${event.header.event_name}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
@@ -402,34 +499,16 @@ export class NotificationHandler {
   ): Promise<void> {
     this.logger.debug('Processing Salesforce case creation');
     try {
-      // Validate the case payload before processing
-      // const caseData = this.validateSalesforceCasePayload(payload);
-
-      // Enrich the payload with additional metadata
       const enrichedPayload = {
-        // tenant: event.tenant,
-        // metadata: {
-        //   source: event.source,
-        //   version: event.version,
-        //   timestamp: new Date().toISOString(),
-        //   eventId: event.id,
-        // },
         ...event,
       };
 
-      // Send the notification event to Salesforce
       await this.salesforceEventService.sendNotificationEvent({
-        type: event.type,
+        type: event.header.event_name,
         data: JSON.stringify(enrichedPayload),
       });
 
-      this.logger.debug('Successfully sent Salesforce event', {
-        // eventId: event.id,
-        // type: event.type,
-        // tenant: event.tenant,
-        // payload: event.encryptedPayload,
-        event,
-      });
+      this.logger.debug('Successfully sent Salesforce event', { event });
     } catch (error) {
       this.logger.error(
         'Failed to send Salesforce case creation event:',
@@ -451,52 +530,49 @@ export class NotificationHandler {
     payload: Record<string, unknown>,
   ): Promise<void> {
     this.logger.debug('Processing application update notification');
+    this.logger.debug(`Notification payload: ${JSON.stringify(payload)}`);
     try {
-      // Validate required fields for application update
-      if (!payload.applicationId) {
-        throw new Error('Application ID is required for update');
-      }
+      // if (!payload.applicationId) {
+      //   throw NotificationError.invalidEvent(
+      //     'Application ID is required for update',
+      //     { eventId: event.id },
+      //   );
+      // }
 
-      // Extract application data
-      const applicationData = {
-        applicationId: payload.applicationId,
-        status: payload.status,
-        updatedFields: payload.updatedFields || {},
-        updateReason: payload.updateReason,
-        updatedBy: payload.updatedBy,
-        ...payload,
-      };
+      // const applicationData = {
+      //   applicationId: payload.applicationId,
+      //   status: payload.status,
+      //   ...payload,
+      // };
 
-      // Enrich the payload with tenant and metadata
       const enrichedPayload = {
-        ...applicationData,
-        tenant: event.tenant,
-        metadata: {
-          source: event.source,
-          version: event.version,
-          timestamp: new Date().toISOString(),
-          eventId: event.id,
-        },
+        // ...applicationData,
+        // tenant: event.header.tenant,
+        // metadata: {
+        //   source: event.payload.activityBy.source,
+        //   version: event.header.event_version,
+        //   timestamp: new Date().toISOString(),
+        //   eventId: event.id,
+        // },
+        ...event,
       };
 
-      // Send the notification event to Salesforce
       await this.salesforceEventService.sendNotificationEvent({
-        type: event.type,
+        type: event.header.event_name,
         data: JSON.stringify(enrichedPayload),
       });
 
       this.logger.debug('Successfully processed application update', {
         eventId: event.id,
         applicationId: payload.applicationId,
-        tenant: event.tenant,
+        tenant: event.header.tenant,
       });
-    } catch (error) {
-      this.logger.error(
-        'Failed to process application update:',
-        error instanceof Error ? error.stack : undefined,
-      );
-      throw new Error(
-        `Failed to process application update: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    } catch (err) {
+      throw NotificationError.sendFailed(
+        err instanceof Error
+          ? err
+          : new Error('Failed to process application update'),
+        { eventId: event.id },
       );
     }
   }
