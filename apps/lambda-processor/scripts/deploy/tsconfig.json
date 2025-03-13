@@ -22,17 +22,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": ".",
-    "baseUrl": ".",
+    "rootDir": "../../../../..",
+    "baseUrl": "../../../../..",
     "paths": {
-      "*": ["node_modules/*"]
+      "@notification-service/*": ["libs/*/src"]
     }
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
-} 
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
