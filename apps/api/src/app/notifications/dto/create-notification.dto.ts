@@ -6,6 +6,7 @@ import {
   IsISO8601,
   ValidateNested,
   IsOptional,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -15,19 +16,19 @@ import { Type } from 'class-transformer';
 export class TenantDto {
   @ApiProperty({
     description: 'Financial institution identifier',
-    example: 'acme-bank',
+    example: 'fi_123',
   })
   @IsNotEmpty()
   @IsString()
-  financialInstitutionId: string;
+  financialInstitutionId = '';
 
   @ApiProperty({
     description: 'Application identifier',
-    example: 'mobile-banking',
+    example: 'app_123',
   })
   @IsNotEmpty()
   @IsString()
-  appId: string;
+  appId = '';
 
   @ApiProperty({
     description: 'Environment (dev, staging, production)',
@@ -35,7 +36,7 @@ export class TenantDto {
   })
   @IsNotEmpty()
   @IsString()
-  environment: string;
+  environment = '';
 }
 
 /**
@@ -44,61 +45,61 @@ export class TenantDto {
 export class CreateNotificationDto {
   @ApiProperty({
     description: 'Unique identifier for the event',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    example: 'uuid-v4',
   })
   @IsUUID()
-  id: string;
+  id = '';
 
   @ApiProperty({
     description: 'Type of the notification event',
-    example: 'transaction.completed',
+    example: 'user.created',
   })
   @IsNotEmpty()
   @IsString()
-  type: string;
+  type = '';
 
   @ApiProperty({
     description: 'Version of the event schema',
-    example: '1.0',
+    example: '1.0.0',
   })
   @IsNotEmpty()
   @IsString()
-  version: string;
+  version = '';
 
   @ApiProperty({
     description: 'Timestamp when the event was created (ISO format)',
-    example: '2023-01-01T12:00:00Z',
+    example: '2024-01-01T00:00:00Z',
   })
   @IsISO8601()
-  timestamp: string;
+  timestamp = new Date().toISOString();
 
   @ApiProperty({
     description: 'Source system that generated the event',
-    example: 'mobile-banking-app',
+    example: 'user-service',
   })
   @IsNotEmpty()
   @IsString()
-  source: string;
+  source = '';
 
   @ApiProperty({
     description: 'Tenant information',
   })
   @ValidateNested()
   @Type(() => TenantDto)
-  tenant: TenantDto;
+  tenant = new TenantDto();
 
   @ApiProperty({
     description: 'Encrypted payload containing the notification data',
-    example: 'AQICAHiWpC0eMDGjJJ4...',
   })
   @IsNotEmpty()
   @IsString()
-  encryptedPayload: string;
+  encryptedPayload = '';
 
   @ApiProperty({
     description: 'Optional metadata for the event',
     required: false,
   })
   @IsOptional()
+  @IsObject()
   metadata?: Record<string, unknown>;
 }
